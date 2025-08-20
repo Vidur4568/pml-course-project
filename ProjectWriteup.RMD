@@ -1,0 +1,79 @@
+---
+title: "Practical Machine Learning Project"
+author: "Vidur Bhardwaj"
+date: "2025-08-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+The goal of this project is to predict the manner in which people performed an exercise.  
+We use data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants.  
+
+# Data Loading
+```{r data}
+library(caret)
+library(randomForest)
+
+train <- read.csv("pml-training.csv")
+test  <- read.csv("pml-testing.csv")
+```
+
+# Data Cleaning
+# Remove variables with too many missing values and irrelevant columns
+
+```{r missing_values}
+train <- train[, colSums(is.na(train)) == 0]   # remove NA columns
+train <- train[, -(1:7)]                       # remove ID/time columns
+test  <- test[, colSums(is.na(test)) == 0]
+test  <- test[, -(1:7)]
+```
+
+# Model Building, Results, and Predictions
+
+```{r train_model_fast}
+library(caret)
+set.seed(123)
+
+# Select only predictor columns that exist in BOTH train and test
+common_predictors <- intersect(names(train)[-ncol(train)], names(test))
+
+# Train using only these predictors + target
+train_small <- train[, c(common_predictors, "classe")]
+
+# Ensure target is factor
+train_small$classe <- factor(train_small$classe)
+
+# 2-fold CV for speed
+control <- trainControl(method="cv", number=2)
+
+# Train Decision Tree (fast)
+model <- train(classe ~ ., data=train_small, method="rpart", trControl=control)
+model
+
+# Accuracy on training set
+pred_train <- predict(model, train_small)
+pred_train <- factor(pred_train, levels = levels(train_small$classe))
+confusionMatrix(pred_train, train_small$classe)
+
+# Predictions on test set
+pred_test <- predict(model, test[, common_predictors])
+pred_test
+
+pml_write_files <- function(predictions){
+  n <- length(predictions)
+  for(i in 1:n){
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(predictions[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+
+# Write your 20 predictions
+pml_write_files(pred_test)
+
+
+
+```
